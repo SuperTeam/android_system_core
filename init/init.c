@@ -652,6 +652,24 @@ static int bootchart_init_action(int nargs, char **args)
 }
 #endif
 
+static int charging_mode(void)
+{
+    int f;
+    char cm;
+    f = open("/sys/class/power_supply/battery/charging_mode_booting", O_RDONLY);
+    if (f < 0)
+    {
+        return 0;
+    }
+    if (1 != read(f, (void *)&cm,1))
+    {
+        return 0;
+    }
+    close(f);
+    return ('1' == cm);
+}
+
+
 int main(int argc, char **argv)
 {
     int fd_count = 0;
@@ -694,7 +712,6 @@ int main(int argc, char **argv)
     log_init();
     
     INFO("reading config file\n");
-    init_parse_config_file("/init.rc");
 
     /* pull the kernel commandline and ramdisk properties file in */
     import_kernel_cmdline(0);
@@ -706,8 +723,14 @@ int main(int argc, char **argv)
     if (!strcmp(bootmode, "2"))
         init_parse_config_file("/recovery.rc");
     else
+    if (charging_mode())
+    {
+        init_parse_config_file("/lpm.rc");
+    }
+    else
 #endif
      {
+        init_parse_config_file("/init.rc");
         get_hardware_name(hardware, &revision);
         snprintf(tmp, sizeof(tmp), "/init.%s.rc", hardware);
         init_parse_config_file(tmp);
